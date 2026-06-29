@@ -24,7 +24,7 @@ DEFINITION = "broad"
 # Deve essere presente nel master CSV scaricato, per esempio [1, 3, 5].
 YEARS_AFTER_DEGREE = [1, 5]
 
-# Il batch replica le 4 strutture Tableau e crea varianti locali per i filtri scelti.
+# Il batch crea varianti locali dei grafici per i filtri scelti.
 # Qui riproduciamo il filtro "tipo corso"; aggiungi atenei/gruppi solo quando servono davvero.
 UNIVERSITY_FILTERS = ["*"]
 DISCIPLINARY_GROUP_FILTERS = ["*"]
