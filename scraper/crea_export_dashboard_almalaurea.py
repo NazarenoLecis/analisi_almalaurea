@@ -163,15 +163,24 @@ def unique(records, field):
     return sort_values({record[field] for record in records if record.get(field) is not None})
 
 
-def filter_options(records, field):
+def filter_options(records, field, include_wildcard=False):
     values = {}
+    if include_wildcard:
+        values["*"] = "Totale"
     for record in records:
         value = record.get(field)
         if value is not None:
             values[value] = display_value(value)
+    ordered_values = sort_values(values)
+    if include_wildcard and "*" in values:
+        ordered_values = ["*"] + [
+            value
+            for value in ordered_values
+            if value != "*"
+        ]
     return [
         {"value": value, "label": values[value]}
-        for value in sort_values(values)
+        for value in ordered_values
     ]
 
 
@@ -259,10 +268,14 @@ def build_metadata(records, source_paths, timeseries_records=None, timeseries_pa
                 {"value": "broad", "label": "Incl. formazione retribuita"},
                 {"value": "restrictive", "label": "Escl. formazione retribuita"},
             ],
-            "university": filter_options(records, "university"),
-            "disciplinary_group": filter_options(records, "disciplinary_group"),
-            "course_type": filter_options(records, "course_type"),
-            "degree_class": filter_options(records, "degree_class"),
+            "university": filter_options(records, "university", include_wildcard=True),
+            "disciplinary_group": filter_options(
+                records,
+                "disciplinary_group",
+                include_wildcard=True,
+            ),
+            "course_type": filter_options(records, "course_type", include_wildcard=True),
+            "degree_class": filter_options(records, "degree_class", include_wildcard=True),
         },
         "methodology": [
             "La coorte di laurea e' calcolata come anno indagine meno anni dalla laurea.",
