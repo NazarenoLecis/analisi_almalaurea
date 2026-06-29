@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from html import unescape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
@@ -66,6 +66,8 @@ OUTPUT_COLUMNS = [
     "graduates",
     "employment_rate",
     "net_monthly_salary",
+    "second_level_enrollment_rate",
+    "current_second_level_enrollment_rate",
     "source_url",
 ]
 
@@ -77,12 +79,15 @@ READY_BOXPLOT_COLUMNS = [
     "Tipo di corso",
     "Numero di laureati",
     "Tasso di occupazione",
+    "Iscritti a laurea magistrale",
+    "Attualmente iscritti a laurea magistrale",
 ]
 
 READY_SCATTER_COLUMNS = [
     "Color_field",
     "Avg. Retribuzione mensile netta",
     "Avg. Tasso di occupazione",
+    "Avg. Iscritti a laurea magistrale",
     "Sum of Numero di laureati",
 ]
 
@@ -301,6 +306,7 @@ def parse_tables(html):
 def extract_metrics_by_definition(html):
     tables = parse_tables(html)
     graduates_by_header = {}
+    second_level_by_header = {}
     metrics = {
         "restrictive": {},
         "broad": {},
@@ -317,6 +323,40 @@ def extract_metrics_by_definition(html):
             if normalize_label(cell_text(cells[0])) == "numero di laureati":
                 set_metric(graduates_by_header, headers, row_values(row), "graduates")
                 break
+
+    for table in tables:
+        if table_section_id(table) != 2:
+            continue
+        headers = table_headers(table)
+        waiting_for_current_second_level = False
+        for row in table_rows(table):
+            cells = row_cells(row)
+            if not cells:
+                continue
+            label = normalize_label(cell_text(cells[0]))
+
+            if label.startswith("si sono iscritti ad un corso di laurea di secondo livello"):
+                set_metric(
+                    second_level_by_header,
+                    headers,
+                    row_values(row),
+                    "second_level_enrollment_rate",
+                )
+                waiting_for_current_second_level = True
+                continue
+
+            if label == "sono attualmente iscritti" and waiting_for_current_second_level:
+                set_metric(
+                    second_level_by_header,
+                    headers,
+                    row_values(row),
+                    "current_second_level_enrollment_rate",
+                )
+                waiting_for_current_second_level = False
+                continue
+
+            if label.startswith("si sono iscritti ad un corso di laurea di primo livello"):
+                waiting_for_current_second_level = False
 
     for table in tables:
         section_id = table_section_id(table)
@@ -346,6 +386,8 @@ def extract_metrics_by_definition(html):
     for definition_records in metrics.values():
         for header, graduate_values in graduates_by_header.items():
             definition_records.setdefault(header, {}).update(graduate_values)
+        for header, second_level_values in second_level_by_header.items():
+            definition_records.setdefault(header, {}).update(second_level_values)
 
     return metrics
 
@@ -379,7 +421,12 @@ def scrape_one_combination(
         for course_type, values in course_metrics.items():
             has_data = any(
                 values.get(metric) is not None
-                for metric in ["graduates", "employment_rate", "net_monthly_salary"]
+                for metric in [
+                    "graduates",
+                    "employment_rate",
+                    "net_monthly_salary",
+                    "second_level_enrollment_rate",
+                ]
             )
             if not has_data:
                 continue
@@ -402,6 +449,10 @@ def scrape_one_combination(
                     "graduates": as_int_if_whole(values.get("graduates")),
                     "employment_rate": values.get("employment_rate"),
                     "net_monthly_salary": values.get("net_monthly_salary"),
+                    "second_level_enrollment_rate": values.get("second_level_enrollment_rate"),
+                    "current_second_level_enrollment_rate": values.get(
+                        "current_second_level_enrollment_rate"
+                    ),
                     "source_url": source_url,
                 }
             )
@@ -512,7 +563,12 @@ def scrape_one_group_course_by_university(
         for university, values in university_metrics.items():
             has_data = any(
                 values.get(metric) is not None
-                for metric in ["graduates", "employment_rate", "net_monthly_salary"]
+                for metric in [
+                    "graduates",
+                    "employment_rate",
+                    "net_monthly_salary",
+                    "second_level_enrollment_rate",
+                ]
             )
             if not has_data:
                 continue
@@ -538,6 +594,10 @@ def scrape_one_group_course_by_university(
                     "graduates": as_int_if_whole(values.get("graduates")),
                     "employment_rate": values.get("employment_rate"),
                     "net_monthly_salary": values.get("net_monthly_salary"),
+                    "second_level_enrollment_rate": values.get("second_level_enrollment_rate"),
+                    "current_second_level_enrollment_rate": values.get(
+                        "current_second_level_enrollment_rate"
+                    ),
                     "source_url": source_url,
                 }
             )
@@ -648,7 +708,12 @@ def scrape_one_group_course_by_degree_class(
                 continue
             has_data = any(
                 values.get(metric) is not None
-                for metric in ["graduates", "employment_rate", "net_monthly_salary"]
+                for metric in [
+                    "graduates",
+                    "employment_rate",
+                    "net_monthly_salary",
+                    "second_level_enrollment_rate",
+                ]
             )
             if not has_data:
                 continue
@@ -671,6 +736,10 @@ def scrape_one_group_course_by_degree_class(
                     "graduates": as_int_if_whole(values.get("graduates")),
                     "employment_rate": values.get("employment_rate"),
                     "net_monthly_salary": values.get("net_monthly_salary"),
+                    "second_level_enrollment_rate": values.get("second_level_enrollment_rate"),
+                    "current_second_level_enrollment_rate": values.get(
+                        "current_second_level_enrollment_rate"
+                    ),
                     "source_url": source_url,
                 }
             )
@@ -760,6 +829,93 @@ def read_csv(path):
         return list(csv.DictReader(input_file))
 
 
+def is_first_level_row(row):
+    return (
+        row.get("course_type_code") == "L"
+        or normalize_label(row.get("course_type", "")) == "laurea di primo livello"
+    )
+
+
+def row_second_level_header(row):
+    if row.get("degree_class", "*") not in {"", "*"}:
+        return row.get("degree_class")
+    university = row.get("university", "*")
+    return "*" if university in {"", "*"} else university
+
+
+def second_level_metrics_from_url(source_url):
+    html = fetch_url(source_url)
+    metrics_by_definition = extract_metrics_by_definition(html)
+    output = {}
+
+    for definition_metrics in metrics_by_definition.values():
+        for header, values in definition_metrics.items():
+            second_level = values.get("second_level_enrollment_rate")
+            current_second_level = values.get("current_second_level_enrollment_rate")
+            if second_level is None and current_second_level is None:
+                continue
+            output[header] = {
+                "second_level_enrollment_rate": second_level,
+                "current_second_level_enrollment_rate": current_second_level,
+            }
+    return output
+
+
+def enrich_rows_with_second_level_metrics(rows, workers=8):
+    source_urls = sorted({
+        row.get("source_url")
+        for row in rows
+        if is_first_level_row(row) and row.get("source_url")
+    })
+    metrics_by_url = {}
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_url = {
+            executor.submit(second_level_metrics_from_url, source_url): source_url
+            for source_url in source_urls
+        }
+        for index, future in enumerate(as_completed(future_to_url), start=1):
+            source_url = future_to_url[future]
+            try:
+                metrics_by_url[source_url] = future.result()
+            except Exception as exc:
+                params = parse_qs(urlparse(source_url).query)
+                print(
+                    "WARNING: skipped second-level enrichment",
+                    f"anno={params.get('anno', [''])[0]}",
+                    f"annolau={params.get('annolau', [''])[0]}",
+                    f"gruppo={params.get('gruppo', [''])[0]}",
+                    f"disaggregazione={params.get('disaggregazione', [''])[0]}",
+                    f"reason={exc}",
+                )
+            if index % 25 == 0 or index == len(source_urls):
+                print(f"Completed {index}/{len(source_urls)} second-level enrichment pages")
+
+    for row in rows:
+        if not is_first_level_row(row):
+            row.setdefault("second_level_enrollment_rate", None)
+            row.setdefault("current_second_level_enrollment_rate", None)
+            continue
+
+        url_metrics = metrics_by_url.get(row.get("source_url"), {})
+        values = url_metrics.get(row_second_level_header(row), {})
+        row["second_level_enrollment_rate"] = values.get("second_level_enrollment_rate")
+        row["current_second_level_enrollment_rate"] = values.get(
+            "current_second_level_enrollment_rate"
+        )
+
+    return rows
+
+
+def enrich_csv_with_second_level_metrics(input_csv, output_csv=None, workers=8):
+    input_csv = Path(input_csv)
+    output_csv = Path(output_csv) if output_csv is not None else input_csv
+    rows = read_csv(input_csv)
+    rows = enrich_rows_with_second_level_metrics(rows=rows, workers=workers)
+    write_csv(output_csv, rows)
+    print(f"Enriched {len(rows)} rows with second-level metrics in {output_csv}")
+
+
 def infer_survey_year(rows):
     years = sorted({int(float(row["survey_year"])) for row in rows if row.get("survey_year")})
     if len(years) != 1:
@@ -799,6 +955,10 @@ def ready_boxplot_rows(rows, graduation_year, definition):
                 "Tipo di corso": display_course_type(row["course_type"]),
                 "Numero di laureati": row["graduates"],
                 "Tasso di occupazione": row["employment_rate"],
+                "Iscritti a laurea magistrale": row.get("second_level_enrollment_rate"),
+                "Attualmente iscritti a laurea magistrale": row.get(
+                    "current_second_level_enrollment_rate"
+                ),
             }
         )
     return output
@@ -816,6 +976,7 @@ def ready_scatter_rows(boxplot_rows):
             {
                 "salary_values": [],
                 "employment_values": [],
+                "second_level_values": [],
                 "graduates": 0,
             },
         )
@@ -823,6 +984,8 @@ def ready_scatter_rows(boxplot_rows):
             grouped[group]["salary_values"].append(float(row["Retribuzione mensile netta"]))
         if row["Tasso di occupazione"] not in {None, ""}:
             grouped[group]["employment_values"].append(float(row["Tasso di occupazione"]))
+        if row["Iscritti a laurea magistrale"] not in {None, ""}:
+            grouped[group]["second_level_values"].append(float(row["Iscritti a laurea magistrale"]))
         if row["Numero di laureati"] not in {None, ""}:
             grouped[group]["graduates"] += int(float(row["Numero di laureati"]))
 
@@ -830,6 +993,7 @@ def ready_scatter_rows(boxplot_rows):
     for group, values in sorted(grouped.items()):
         salary_values = values["salary_values"]
         employment_values = values["employment_values"]
+        second_level_values = values["second_level_values"]
         output.append(
             {
                 "Color_field": group,
@@ -838,6 +1002,9 @@ def ready_scatter_rows(boxplot_rows):
                 ),
                 "Avg. Tasso di occupazione": (
                     sum(employment_values) / len(employment_values) if employment_values else None
+                ),
+                "Avg. Iscritti a laurea magistrale": (
+                    sum(second_level_values) / len(second_level_values) if second_level_values else None
                 ),
                 "Sum of Numero di laureati": values["graduates"],
             }

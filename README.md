@@ -50,6 +50,7 @@ La parte dati e' divisa in tre file:
 In `scraper/download_dati_almalaurea.py` le variabili principali sono:
 
 - `USE_LATEST_SURVEY_YEAR`: se `True`, usa l'ultimo anno disponibile sul sito AlmaLaurea
+- `SURVEY_YEARS`: se valorizzata, scarica piu' anni di indagine, ad esempio `[2022, 2023, 2024, 2025]`
 - `YEARS_AFTER_DEGREE`: distanze temporali dalla laurea, ad esempio `[1, 5]`
 - `DEFINITIONS`: definizioni occupazionali da scaricare, ad esempio `["restrictive", "broad"]`
 - `INCLUDE_DEGREE_CLASS_DATA`: se `True`, include anche le righe per classe di laurea
@@ -87,6 +88,7 @@ Il master CSV contiene anche campi tecnici utili per filtrare e ricostruire l'or
 - numero di laureati
 - tasso di occupazione
 - retribuzione mensile netta
+- quota di laureati di primo livello iscritti a un corso di secondo livello
 - URL sorgente AlmaLaurea
 
 Nel codice:
@@ -118,12 +120,20 @@ I CSV aggregati usati per controllare gli scatter sono salvati in `outputs/dati/
 
 ## Export Dashboard Web
 
-Lo script `scraper/crea_export_dashboard_almalaurea.py` legge automaticamente il master CSV piu' recente in `outputs/dati` e scrive:
+Lo script `scraper/crea_export_dashboard_almalaurea.py` legge automaticamente i master CSV presenti in `outputs/dati` e scrive:
 
 - `outputs/web/almalaurea_dashboard_data.json`
 - `outputs/web/almalaurea_metadata.json`
+- `outputs/web/almalaurea_timeseries_data.json`
 
 Questi file sono pensati per una dashboard statica pubblicabile su GitHub Pages: il sito legge i JSON direttamente dal browser e applica i filtri lato client.
+
+Se in `outputs/dati` sono presenti master CSV di piu' anni, l'export web usa due livelli:
+
+- dashboard dettagliata: ultimi 10 anni di indagine disponibili, con filtri granulari come ateneo, gruppo, tipo corso e classe di laurea
+- serie storiche: tutti gli anni scaricati dal 2008 in poi, senza dettaglio per classe di laurea, per mantenere il dataset leggero e confrontabile
+
+Per le lauree di primo livello, il JSON include anche la quota di laureati iscritti a un corso di secondo livello. Questo aiuta a leggere correttamente il tasso di occupazione a 1 anno dalla laurea, che puo' essere piu' basso quando molti laureati proseguono con la magistrale.
 
 ## Note Sui Dati
 

@@ -1,0 +1,118 @@
+﻿dimension,code,label
+anno,2025,2025
+anno,2024,2024
+anno,2023,2023
+anno,2022,2022
+anno,2021,2021
+anno,2020,2020
+anno,2019,2019
+anno,2018,2018
+anno,2017,2017
+anno,2016,2016
+anno,2015,2015
+anno,2014,2014
+anno,2013,2013
+anno,2012,2012
+anno,2011,2011
+anno,2010,2010
+anno,2009,2009
+anno,2008,2008
+livello,tutti,tutti
+livello,1,primo livello
+livello,2,secondo livello
+corstipo,tutti,tutti
+corstipo,L,laurea di primo livello
+corstipo,LSE,laurea magistrale a ciclo unico
+corstipo,LS,laurea magistrale biennale
+corstipo,CDL2,Scienze della Formazione primaria (corso pre-riforma D.M. n. 249/2010)
+annolau,1,1
+annolau,3,3
+annolau,5,5
+ateneo,tutti,tutti
+ateneo,70002,Bari
+ateneo,70048,Bari Politecnico
+ateneo,70038,Basilicata
+ateneo,70051,Bergamo
+ateneo,70003,Bologna
+ateneo,70130,Bolzano
+ateneo,70046,Brescia
+ateneo,70004,Cagliari
+ateneo,70005,Calabria
+ateneo,70006,Camerino
+ateneo,70049,Campania Luigi Vanvitelli
+ateneo,70007,Cassino e Lazio Meridionale
+ateneo,70008,Catania
+ateneo,70125,Catanzaro
+ateneo,70053,Chieti e Pescara
+ateneo,70146,Enna Kore
+ateneo,70009,Ferrara
+ateneo,70010,Firenze
+ateneo,70129,Foggia
+ateneo,70011,Genova
+ateneo,70135,Insubria
+ateneo,70055,L’Aquila
+ateneo,70050,LIUC Carlo Cattaneo
+ateneo,70137,LUM Giuseppe Degennaro
+ateneo,70013,Macerata
+ateneo,70001,Marche Politecnica
+ateneo,70014,Messina
+ateneo,70015,Milano
+ateneo,70132,Milano Bicocca
+ateneo,70058,Milano IULM
+ateneo,70119,Milano Vita-Salute S. Raffaele
+ateneo,70017,Modena e Reggio Emilia
+ateneo,70039,Molise
+ateneo,70018,Napoli Federico II
+ateneo,70042,Napoli L’Orientale
+ateneo,70041,Napoli Parthenope
+ateneo,70019,Padova
+ateneo,70020,Palermo
+ateneo,70021,Parma
+ateneo,70022,Pavia
+ateneo,70023,Perugia
+ateneo,70099,Perugia Stranieri
+ateneo,70136,Piemonte Orientale
+ateneo,70024,Pisa
+ateneo,70047,Reggio Calabria Mediterranea
+ateneo,70110,Roma Campus Bio-Medico
+ateneo,70121,Roma Foro Italico
+ateneo,70060,Roma LUMSA
+ateneo,70026,Roma Sapienza
+ateneo,70027,Roma Tor Vergata
+ateneo,70117,Roma Tre
+ateneo,70220,Roma UNINT
+ateneo,70012,Salento
+ateneo,70028,Salerno
+ateneo,70124,Sannio
+ateneo,70029,Sassari
+ateneo,70145,Scienze Gastronomiche
+ateneo,70030,Siena
+ateneo,70097,Siena Stranieri
+ateneo,70118,Teramo
+ateneo,70031,Torino
+ateneo,70032,Torino Politecnico
+ateneo,70062,Trento
+ateneo,70033,Trieste
+ateneo,70035,Tuscia
+ateneo,70034,Udine
+ateneo,70063,Urbino Carlo Bo
+ateneo,70141,Valle d’Aosta
+ateneo,70036,Venezia Ca’ Foscari
+ateneo,70037,Venezia IUAV
+ateneo,70040,Verona
+gruppo,tutti,tutti
+gruppo,13,Agrario-Forestale e Veterinario
+gruppo,11,Architettura e Ingegneria civile
+gruppo,2,Arte e Design
+gruppo,7,Economico
+gruppo,1,Educazione e Formazione
+gruppo,8,Giuridico
+gruppo,10,Informatica e Tecnologie ICT
+gruppo,12,Ingegneria industriale e dell'informazione
+gruppo,3,Letterario-Umanistico
+gruppo,4,Linguistico
+gruppo,14,Medico-Sanitario e Farmaceutico
+gruppo,5,Politico-Sociale e Comunicazione
+gruppo,6,Psicologico
+gruppo,9,Scientifico
+gruppo,15,Scienze motorie e sportive
