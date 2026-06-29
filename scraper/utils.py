@@ -374,10 +374,20 @@ def extract_metrics_by_definition(html):
             label = normalize_label(cell_text(cells[0]))
 
             if label.startswith("tasso di occupazione"):
-                current_indicator = "employment_rate"
+                values = row_values(row)
+                if any(value is not None for value in values):
+                    set_metric(metrics[definition], headers, values, "employment_rate")
+                    current_indicator = None
+                else:
+                    current_indicator = "employment_rate"
                 continue
             if label.startswith("retribuzione mensile netta"):
-                current_indicator = "net_monthly_salary"
+                values = row_values(row)
+                if any(value is not None for value in values):
+                    set_metric(metrics[definition], headers, values, "net_monthly_salary")
+                    current_indicator = None
+                else:
+                    current_indicator = "net_monthly_salary"
                 continue
             if label == "totale" and current_indicator:
                 set_metric(metrics[definition], headers, row_values(row), current_indicator)
