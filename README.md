@@ -32,6 +32,12 @@ python scraper/crea_struttura_dataset_almalaurea.py
 python charts/main.py
 ```
 
+4. Crea i JSON per la dashboard web.
+
+```powershell
+python scraper/crea_export_dashboard_almalaurea.py
+```
+
 ## Configurazione Dati
 
 La parte dati e' divisa in tre file:
@@ -39,6 +45,7 @@ La parte dati e' divisa in tre file:
 - `scraper/utils.py`: funzioni comuni per download, parsing e scrittura CSV
 - `scraper/download_dati_almalaurea.py`: configurazione ed esecuzione dello scarico
 - `scraper/crea_struttura_dataset_almalaurea.py`: creazione dei CSV pronti a partire dal master
+- `scraper/crea_export_dashboard_almalaurea.py`: creazione dei JSON statici usati dalla dashboard web
 
 In `scraper/download_dati_almalaurea.py` le variabili principali sono:
 
@@ -108,6 +115,15 @@ Ogni PNG riporta nel sottotitolo il filtro applicato, ad esempio:
 I grafici sono salvati in `outputs/grafici` e la cartella contiene solo file PNG.
 
 I CSV aggregati usati per controllare gli scatter sono salvati in `outputs/dati/aggregati_grafici`.
+
+## Export Dashboard Web
+
+Lo script `scraper/crea_export_dashboard_almalaurea.py` legge automaticamente il master CSV piu' recente in `outputs/dati` e scrive:
+
+- `outputs/web/almalaurea_dashboard_data.json`
+- `outputs/web/almalaurea_metadata.json`
+
+Questi file sono pensati per una dashboard statica pubblicabile su GitHub Pages: il sito legge i JSON direttamente dal browser e applica i filtri lato client.
 
 ## Note Sui Dati
 
