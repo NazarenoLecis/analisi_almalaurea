@@ -1,6 +1,6 @@
 # analisi_almalaurea
 
-Strumenti per estrarre dati occupazionali dal sito AlmaLaurea e rigenerare dataset/grafici comparabili alle dashboard Tableau.
+Script Python per scaricare dati occupazionali da AlmaLaurea, salvarli in CSV puliti e generare grafici statici su occupazione e retribuzione dei laureati.
 
 ## Setup
 
@@ -10,82 +10,110 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
-Le dipendenze in `requirements.txt` servono per leggere l'HTML AlmaLaurea e generare i grafici.
+Le dipendenze servono per leggere le pagine HTML di AlmaLaurea, creare dataset tabellari e produrre grafici PNG.
 
-## Dati AlmaLaurea
+## Flusso Di Lavoro
 
-La parte dati e' divisa in tre file:
-
-- `scraper/utils.py`: funzioni comuni
-- `scraper/download_dati_almalaurea.py`: download dal sito AlmaLaurea e salvataggio del master CSV
-- `scraper/crea_struttura_dataset_almalaurea.py`: creazione dei CSV pronti a partire dal master
-
-Configura le variabili in `scraper/download_dati_almalaurea.py`, poi esegui:
+1. Scarica i dati da AlmaLaurea.
 
 ```powershell
 python scraper/download_dati_almalaurea.py
 ```
 
-Per un test rapido, imposta in `scraper/download_dati_almalaurea.py`:
-
-```python
-LIMIT_GROUPS = 2
-LIMIT_COURSE_TYPES = 2
-```
-
-Per l'estrazione completa, rimetti entrambe a `None`.
-La configurazione predefinita usa sempre l'ultimo anno disponibile sul sito AlmaLaurea:
-
-```python
-USE_LATEST_SURVEY_YEAR = True
-```
-
-La variabile `YEARS_AFTER_DEGREE` definisce a quanti anni dalla laurea leggere i dati, ad esempio `[1, 3, 5]`.
-Il rapporto tra anno di indagine e coorte e': `anno laurea = anno indagine - anni dalla laurea`.
-
-Poi crea la struttura pronta:
+2. Crea i CSV pronti per analisi e grafici.
 
 ```powershell
 python scraper/crea_struttura_dataset_almalaurea.py
 ```
 
-Output:
-
-- `outputs/dati/almalaurea_occupazione__survey_2025__annolau_1_5__defs_restrictive_broad.csv`
-- `outputs/dati/almalaurea_lookups__survey_2025.csv`
-- `outputs/dati/ready/almalaurea_survey_2025__laureati_2020__annolau_5__broad__boxplot.csv`
-- `outputs/dati/ready/almalaurea_survey_2025__laureati_2020__annolau_5__broad__scatter.csv`
-- `outputs/dati/ready/almalaurea_survey_2025__laureati_2024__annolau_1__broad__boxplot.csv`
-- `outputs/dati/ready/almalaurea_survey_2025__laureati_2024__annolau_1__broad__scatter.csv`
-
-Il dataset principale contiene sia la definizione restrittiva sia quella meno restrittiva di occupato.
-Nel codice, `broad` indica la definizione meno restrittiva: tra gli occupati sono incluse anche le attivita' di formazione retribuite.
-`restrictive` indica la definizione restrittiva: quelle attivita' di formazione retribuite sono escluse.
-Quando `INCLUDE_DEGREE_CLASS_DATA = True`, il master CSV include anche le righe a livello di `degree_class`, cioe' classe di laurea/corso, oltre alle righe aggregate per ateneo e gruppo disciplinare.
-I file in `outputs/dati/ready` sono quelli piu' comodi da usare direttamente per i grafici: una base lunga per i boxplot e una base aggregata per gli scatter.
-
-## Grafici
+3. Genera i grafici.
 
 ```powershell
 python charts/main.py
 ```
 
-Configura definizione, anni e liste di filtri direttamente in `charts/main.py`.
-Se `INPUT_CSV = None`, i grafici usano automaticamente il master CSV AlmaLaurea piu' recente presente in `outputs/dati`.
-Il batch replica le 4 strutture degli esempi ricevuti: boxplot e scatter per le due distanze temporali configurate, ad esempio 1 e 5 anni dalla laurea.
-Dato che localmente non ci sono i filtri interattivi di Tableau, per ogni struttura vengono prodotti piu' PNG: una vista totale e una vista per ciascun `tipo corso` configurato.
-Ogni PNG riporta nel sottotitolo il filtro applicato, ad esempio `filtro: totale` oppure `filtro: tipo corso: LM biennale`.
+## Configurazione Dati
 
-Output:
+La parte dati e' divisa in tre file:
 
-- `outputs/grafici/boxplot__s2025__l2024__a1__broad__u_all__g_all__t_all.png`
-- `outputs/grafici/scatter__s2025__l2024__a1__broad__u_all__g_all__t_all__split_disciplinary_group.png`
-- `outputs/grafici/boxplot__s2025__l2024__a1__broad__u_all__g_all__t_lm_biennale.png`
-- `outputs/grafici/scatter__s2025__l2024__a1__broad__u_all__g_all__t_lm_biennale__split_disciplinary_group.png`
-- file analoghi per le altre viste disponibili.
+- `scraper/utils.py`: funzioni comuni per download, parsing e scrittura CSV
+- `scraper/download_dati_almalaurea.py`: configurazione ed esecuzione dello scarico
+- `scraper/crea_struttura_dataset_almalaurea.py`: creazione dei CSV pronti a partire dal master
 
-La cartella `outputs/grafici` contiene solo PNG.
+In `scraper/download_dati_almalaurea.py` le variabili principali sono:
+
+- `USE_LATEST_SURVEY_YEAR`: se `True`, usa l'ultimo anno disponibile sul sito AlmaLaurea
+- `YEARS_AFTER_DEGREE`: distanze temporali dalla laurea, ad esempio `[1, 5]`
+- `DEFINITIONS`: definizioni occupazionali da scaricare, ad esempio `["restrictive", "broad"]`
+- `INCLUDE_DEGREE_CLASS_DATA`: se `True`, include anche le righe per classe di laurea
+- `LIMIT_GROUPS` e `LIMIT_COURSE_TYPES`: utili per test rapidi; per lo scarico completo lasciale a `None`
+
+Il rapporto tra anno di indagine e coorte e':
+
+```text
+anno laurea = anno indagine - anni dalla laurea
+```
+
+## Output Dati
+
+I file principali finiscono in `outputs/dati`.
+
+Esempio con survey 2025:
+
+- `outputs/dati/almalaurea_occupazione__survey_2025__annolau_1_5__defs_restrictive_broad.csv`
+- `outputs/dati/almalaurea_lookups__survey_2025.csv`
+- `outputs/dati/ready/almalaurea_survey_2025__laureati_2024__annolau_1__broad__boxplot.csv`
+- `outputs/dati/ready/almalaurea_survey_2025__laureati_2024__annolau_1__broad__scatter.csv`
+- `outputs/dati/ready/almalaurea_survey_2025__laureati_2020__annolau_5__broad__boxplot.csv`
+- `outputs/dati/ready/almalaurea_survey_2025__laureati_2020__annolau_5__broad__scatter.csv`
+
+Il master CSV contiene anche campi tecnici utili per filtrare e ricostruire l'origine dei dati:
+
+- anno di indagine
+- anni dalla laurea
+- coorte di laurea
+- definizione occupazionale
+- ateneo
+- gruppo disciplinare
+- tipo di corso
+- eventuale classe di laurea
+- numero di laureati
+- tasso di occupazione
+- retribuzione mensile netta
+- URL sorgente AlmaLaurea
+
+Nel codice:
+
+- `broad` indica la definizione meno restrittiva di occupato, che include anche le attivita' di formazione retribuite
+- `restrictive` indica la definizione restrittiva, che esclude quelle attivita'
+
+## Grafici
+
+La generazione dei grafici si configura in `charts/main.py`.
+
+Se `INPUT_CSV = None`, viene usato automaticamente il master CSV AlmaLaurea piu' recente presente in `outputs/dati`.
+
+Il batch standard produce:
+
+- boxplot della retribuzione per gruppo disciplinare
+- scatter occupazione/retribuzione per gruppo disciplinare
+- varianti per le distanze temporali configurate, ad esempio 1 e 5 anni dalla laurea
+- varianti per i tipi di corso configurati, ad esempio totale, laurea di primo livello, LM ciclo unico, LM biennale
+
+Ogni PNG riporta nel sottotitolo il filtro applicato, ad esempio:
+
+- `filtro: totale`
+- `filtro: tipo corso: LM biennale`
+
+I grafici sono salvati in `outputs/grafici` e la cartella contiene solo file PNG.
+
 I CSV aggregati usati per controllare gli scatter sono salvati in `outputs/dati/aggregati_grafici`.
-Gli scatter del batch standard usano sempre la suddivisione per gruppo disciplinare: un punto corrisponde a un gruppo, il colore identifica lo stesso gruppo e la dimensione della bolla rappresenta il numero di laureati.
-I dati a livello di classe di laurea possono restare nel master CSV, ma non vengono trasformati automaticamente in PNG per evitare grafici locali non confrontabili con gli esempi Tableau.
-I PNG includono fonte, elaborazione e nota metodologica sulla coorte osservata.
+
+## Note Sui Dati
+
+Non tutte le combinazioni di anno, distanza dalla laurea, gruppo disciplinare e tipo corso sono disponibili sul sito AlmaLaurea.
+Quando una combinazione non e' pubblicata o non e' coerente per AlmaLaurea, lo script la salta e continua lo scarico delle altre viste.
+
+Per esempio, alcuni gruppi disciplinari non hanno dati per `LM ciclo unico`; in quel caso i relativi punti non compaiono nei grafici filtrati.
+
+I PNG includono fonte, anno AlmaLaurea, elaborazione e nota metodologica sulla coorte osservata.
