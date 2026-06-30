@@ -49,6 +49,9 @@ COURSE_TYPE_CODES = {
     "laurea magistrale biennale": "LS",
 }
 
+EXCLUDED_COURSE_TYPE_CODES = {"CDL2"}
+LSE_GROUP_CODES = {"1", "3", "8", "11", "13", "14"}
+
 OUTPUT_COLUMNS = [
     "survey_year",
     "years_after_degree",
@@ -217,15 +220,27 @@ def build_visualizza_url(
     disaggregation="corstipo",
     course_type_code="tutti",
 ):
-    params = {
-        **DEFAULT_VISUALIZZA_PARAMS,
-        "anno": str(survey_year),
-        "annolau": str(years_after_degree),
-        "ateneo": university_code,
-        "gruppo": group_code,
-        "disaggregazione": disaggregation,
-        "corstipo": course_type_code,
-    }
+    # AlmaLaurea's legacy endpoint is order-sensitive: the official form
+    # redirects to visualizza.php with CONFIG at the end of the query string.
+    params = [
+        ("anno", str(survey_year)),
+        ("corstipo", course_type_code),
+        ("ateneo", university_code),
+        ("facolta", DEFAULT_VISUALIZZA_PARAMS["facolta"]),
+        ("gruppo", group_code),
+        ("livello", DEFAULT_VISUALIZZA_PARAMS["livello"]),
+        ("area4", DEFAULT_VISUALIZZA_PARAMS["area4"]),
+        ("pa", DEFAULT_VISUALIZZA_PARAMS["pa"]),
+        ("classe", DEFAULT_VISUALIZZA_PARAMS["classe"]),
+        ("postcorso", DEFAULT_VISUALIZZA_PARAMS["postcorso"]),
+        ("annolau", str(years_after_degree)),
+        ("isstella", DEFAULT_VISUALIZZA_PARAMS["isstella"]),
+        ("condocc", DEFAULT_VISUALIZZA_PARAMS["condocc"]),
+        ("iscrls", DEFAULT_VISUALIZZA_PARAMS["iscrls"]),
+        ("disaggregazione", disaggregation),
+        ("LANG", "it"),
+        ("CONFIG", DEFAULT_VISUALIZZA_PARAMS["CONFIG"]),
+    ]
     return f"{BASE_URL}/visualizza.php?{urlencode(params)}"
 
 
@@ -476,6 +491,19 @@ def selected_options(options, include_total, limit):
     return selected
 
 
+def valid_course_type_task(years_after_degree, group, course_type):
+    course_type_value = str(course_type["value"])
+    group_value = str(group["value"])
+
+    if course_type_value in EXCLUDED_COURSE_TYPE_CODES:
+        return False
+    if course_type_value == "L" and int(years_after_degree) != 1:
+        return False
+    if course_type_value == "LSE" and group_value not in LSE_GROUP_CODES:
+        return False
+    return True
+
+
 def scrape_dashboard_dataset(
     survey_year,
     years_after_degree_values,
@@ -645,6 +673,7 @@ def scrape_dashboard_dataset_by_university(
         for years_after_degree in years_after_degree_values
         for group in groups
         for course_type in course_types
+        if valid_course_type_task(years_after_degree, group, course_type)
     ]
 
     rows = []
@@ -781,6 +810,7 @@ def scrape_degree_class_dataset(
         for years_after_degree in years_after_degree_values
         for group in groups
         for course_type in course_types
+        if valid_course_type_task(years_after_degree, group, course_type)
     ]
 
     rows = []
