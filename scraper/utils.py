@@ -4,6 +4,7 @@ import csv
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from http.client import IncompleteRead
 from html import unescape
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -66,6 +67,8 @@ OUTPUT_COLUMNS = [
     "course_type",
     "degree_class_code",
     "degree_class",
+    "degree_course_code",
+    "degree_course",
     "graduates",
     "employment_rate",
     "net_monthly_salary",
@@ -159,7 +162,7 @@ def fetch_url(url, retries=3, timeout=60, pause=1.5):
             request = Request(url, headers={"User-Agent": USER_AGENT})
             with urlopen(request, timeout=timeout) as response:
                 return response.read().decode("utf-8", errors="replace")
-        except (HTTPError, TimeoutError, URLError) as exc:
+        except (HTTPError, IncompleteRead, TimeoutError, URLError) as exc:
             last_error = exc
             if attempt < retries - 1:
                 time.sleep(pause * (attempt + 1))
@@ -193,6 +196,17 @@ def get_options(config, survey_year):
     return parse_select_options(fetch_url(url))
 
 
+def get_selection_options(config="occupazione", **params):
+    query = {"config": config, "lang": "it"}
+    query.update({
+        name: value
+        for name, value in params.items()
+        if value not in {None, ""}
+    })
+    url = f"{BASE_URL}/solotendine.php?{urlencode(query)}"
+    return parse_select_options(fetch_url(url))
+
+
 def get_available_survey_years(config="occupazione", reference_year=2022):
     options = get_options(config=config, survey_year=reference_year)
     years = []
@@ -219,6 +233,8 @@ def build_visualizza_url(
     group_code,
     disaggregation="corstipo",
     course_type_code="tutti",
+    class_code="tutti",
+    post_course_code="tutti",
 ):
     # AlmaLaurea's legacy endpoint is order-sensitive: the official form
     # redirects to visualizza.php with CONFIG at the end of the query string.
@@ -231,8 +247,8 @@ def build_visualizza_url(
         ("livello", DEFAULT_VISUALIZZA_PARAMS["livello"]),
         ("area4", DEFAULT_VISUALIZZA_PARAMS["area4"]),
         ("pa", DEFAULT_VISUALIZZA_PARAMS["pa"]),
-        ("classe", DEFAULT_VISUALIZZA_PARAMS["classe"]),
-        ("postcorso", DEFAULT_VISUALIZZA_PARAMS["postcorso"]),
+        ("classe", class_code),
+        ("postcorso", post_course_code),
         ("annolau", str(years_after_degree)),
         ("isstella", DEFAULT_VISUALIZZA_PARAMS["isstella"]),
         ("condocc", DEFAULT_VISUALIZZA_PARAMS["condocc"]),
@@ -279,11 +295,15 @@ def table_headers(table):
                 "<b>gruppo disciplinare</b>:",
                 "<b>Ateneo</b>:",
                 "<b>classe di laurea</b>:",
+                "<b>corso di laurea</b>:",
             ]
         ):
             continue
         label_html = match.group("label")
-        label_text = BeautifulSoup(label_html, "html.parser").get_text(" ", strip=True)
+        if "<" in label_html:
+            label_text = BeautifulSoup(label_html, "html.parser").get_text(" ", strip=True)
+        else:
+            label_text = label_html
         regex_headers.append(clean_text(label_text))
 
     if regex_headers:
@@ -471,6 +491,8 @@ def scrape_one_combination(
                     "course_type": course_type,
                     "degree_class_code": "tutti",
                     "degree_class": "*",
+                    "degree_course_code": "tutti",
+                    "degree_course": "*",
                     "graduates": as_int_if_whole(values.get("graduates")),
                     "employment_rate": values.get("employment_rate"),
                     "net_monthly_salary": values.get("net_monthly_salary"),
@@ -629,6 +651,8 @@ def scrape_one_group_course_by_university(
                     "course_type": course_type_label,
                     "degree_class_code": "tutti",
                     "degree_class": "*",
+                    "degree_course_code": "tutti",
+                    "degree_course": "*",
                     "graduates": as_int_if_whole(values.get("graduates")),
                     "employment_rate": values.get("employment_rate"),
                     "net_monthly_salary": values.get("net_monthly_salary"),
@@ -721,6 +745,7 @@ def scrape_dashboard_dataset_by_university(
 def scrape_one_group_course_by_degree_class(
     survey_year,
     years_after_degree,
+    university,
     group,
     course_type,
     definitions,
@@ -728,7 +753,7 @@ def scrape_one_group_course_by_degree_class(
     source_url = build_visualizza_url(
         survey_year=survey_year,
         years_after_degree=years_after_degree,
-        university_code="tutti",
+        university_code=university["value"],
         group_code=group["value"],
         disaggregation="classe",
         course_type_code=course_type["value"],
@@ -764,14 +789,16 @@ def scrape_one_group_course_by_degree_class(
                     "graduation_year": graduation_year,
                     "employment_definition": definition,
                     "employment_definition_label": DEFINITION_LABELS[definition],
-                    "university_code": "tutti",
-                    "university": "*",
+                    "university_code": university["value"],
+                    "university": "*" if university["value"] == "tutti" else university["text"],
                     "disciplinary_group_code": group["value"],
                     "disciplinary_group": group["text"],
                     "course_type_code": course_type["value"],
                     "course_type": course_type_label,
                     "degree_class_code": slugify(degree_class),
                     "degree_class": degree_class,
+                    "degree_course_code": "tutti",
+                    "degree_course": "*",
                     "graduates": as_int_if_whole(values.get("graduates")),
                     "employment_rate": values.get("employment_rate"),
                     "net_monthly_salary": values.get("net_monthly_salary"),
@@ -785,10 +812,240 @@ def scrape_one_group_course_by_degree_class(
     return rows
 
 
+def row_has_downloaded_metrics(row):
+    return any(
+        row.get(metric) not in {None, "", 0, "0", "0.0"}
+        for metric in [
+            "graduates",
+            "employment_rate",
+            "net_monthly_salary",
+            "second_level_enrollment_rate",
+        ]
+    )
+
+
+def degree_class_tasks_from_base_rows(base_rows):
+    tasks_by_key = {}
+    for row in base_rows:
+        if row.get("degree_class", "*") != "*":
+            continue
+        if row.get("disciplinary_group_code") in {"", "tutti"}:
+            continue
+        if not row_has_downloaded_metrics(row):
+            continue
+
+        key = (
+            int(row["years_after_degree"]),
+            str(row["university_code"]),
+            str(row["disciplinary_group_code"]),
+            str(row["course_type_code"]),
+        )
+        if key in tasks_by_key:
+            continue
+
+        university_label = "*" if row["university_code"] == "tutti" else row["university"]
+        course_type_label = "*" if row["course_type_code"] == "tutti" else row["course_type"]
+        tasks_by_key[key] = (
+            int(row["years_after_degree"]),
+            {
+                "value": row["university_code"],
+                "text": university_label,
+            },
+            {
+                "value": row["disciplinary_group_code"],
+                "text": row["disciplinary_group"],
+            },
+            {
+                "value": row["course_type_code"],
+                "text": course_type_label,
+            },
+        )
+    return sorted(
+        tasks_by_key.values(),
+        key=lambda task: (
+            task[0],
+            str(task[2]["text"]),
+            str(task[3]["text"]),
+            str(task[1]["text"]),
+        ),
+    )
+
+
+def codes_in_parentheses(value):
+    codes = []
+    for group in re.findall(r"\(([^()]*)\)", value or ""):
+        codes.extend(code.strip() for code in group.split(",") if code.strip())
+    return codes
+
+
+def degree_class_for_course(course_label, class_options):
+    course_codes = codes_in_parentheses(course_label)
+    if not course_codes:
+        return None
+    for option in class_options:
+        if option["value"] == "tutti":
+            continue
+        class_label = option["text"]
+        class_codes = codes_in_parentheses(class_label)
+        if any(code in class_codes for code in course_codes):
+            return class_label
+    return None
+
+
+def scrape_one_group_course_by_degree_course(
+    survey_year,
+    years_after_degree,
+    university,
+    group,
+    course_type,
+    definitions,
+):
+    if course_type["value"] == "tutti":
+        return []
+
+    try:
+        selection_options = get_selection_options(
+            config="occupazione",
+            anno=survey_year,
+            corstipo=course_type["value"],
+            ateneo=university["value"],
+            gruppo=group["value"],
+            annolau=years_after_degree,
+        )
+    except Exception as exc:
+        print(
+            "WARNING: degree-course options unavailable",
+            f"annolau={years_after_degree}",
+            f"ateneo={university['value']}",
+            f"gruppo={group['value']}",
+            f"corstipo={course_type['value']}",
+            f"reason={exc}",
+        )
+        selection_options = {}
+    class_options = selection_options.get("classe", [])
+    course_code_by_label = {
+        option["text"]: option["value"]
+        for option in selection_options.get("postcorso", [])
+        if option["value"] != "tutti"
+    }
+    source_url = build_visualizza_url(
+        survey_year=survey_year,
+        years_after_degree=years_after_degree,
+        university_code=university["value"],
+        group_code=group["value"],
+        disaggregation="postcorso",
+        course_type_code=course_type["value"],
+    )
+    html = fetch_url(source_url)
+    metrics_by_definition = extract_metrics_by_definition(html)
+    graduation_year = survey_year - years_after_degree
+
+    rows = []
+    for definition, course_metrics in metrics_by_definition.items():
+        if definition not in definitions:
+            continue
+        for degree_course, values in course_metrics.items():
+            if degree_course == "*":
+                continue
+            has_data = any(
+                values.get(metric) is not None
+                for metric in [
+                    "graduates",
+                    "employment_rate",
+                    "net_monthly_salary",
+                    "second_level_enrollment_rate",
+                ]
+            )
+            if not has_data:
+                continue
+
+            degree_class = degree_class_for_course(degree_course, class_options) or "*"
+            rows.append(
+                {
+                    "survey_year": survey_year,
+                    "years_after_degree": years_after_degree,
+                    "graduation_year": graduation_year,
+                    "employment_definition": definition,
+                    "employment_definition_label": DEFINITION_LABELS[definition],
+                    "university_code": university["value"],
+                    "university": "*" if university["value"] == "tutti" else university["text"],
+                    "disciplinary_group_code": group["value"],
+                    "disciplinary_group": group["text"],
+                    "course_type_code": course_type["value"],
+                    "course_type": course_type["text"],
+                    "degree_class_code": "tutti" if degree_class == "*" else slugify(degree_class),
+                    "degree_class": degree_class,
+                    "degree_course_code": course_code_by_label.get(
+                        degree_course,
+                        slugify(degree_course),
+                    ),
+                    "degree_course": degree_course,
+                    "graduates": as_int_if_whole(values.get("graduates")),
+                    "employment_rate": values.get("employment_rate"),
+                    "net_monthly_salary": values.get("net_monthly_salary"),
+                    "second_level_enrollment_rate": values.get("second_level_enrollment_rate"),
+                    "current_second_level_enrollment_rate": values.get(
+                        "current_second_level_enrollment_rate"
+                    ),
+                    "source_url": source_url,
+                }
+            )
+    return rows
+
+
+def degree_course_tasks_from_base_rows(base_rows):
+    tasks_by_key = {}
+    for row in base_rows:
+        if row.get("degree_class", "*") != "*":
+            continue
+        if row.get("course_type_code") in {"", "tutti"}:
+            continue
+        if row.get("disciplinary_group_code") in {"", "tutti"}:
+            continue
+        if not row_has_downloaded_metrics(row):
+            continue
+
+        key = (
+            int(row["years_after_degree"]),
+            str(row["university_code"]),
+            str(row["disciplinary_group_code"]),
+            str(row["course_type_code"]),
+        )
+        if key in tasks_by_key:
+            continue
+
+        university_label = "*" if row["university_code"] == "tutti" else row["university"]
+        tasks_by_key[key] = (
+            int(row["years_after_degree"]),
+            {
+                "value": row["university_code"],
+                "text": university_label,
+            },
+            {
+                "value": row["disciplinary_group_code"],
+                "text": row["disciplinary_group"],
+            },
+            {
+                "value": row["course_type_code"],
+                "text": row["course_type"],
+            },
+        )
+    return sorted(
+        tasks_by_key.values(),
+        key=lambda task: (
+            task[0],
+            str(task[2]["text"]),
+            str(task[3]["text"]),
+            str(task[1]["text"]),
+        ),
+    )
+
+
 def scrape_degree_class_dataset(
     survey_year,
     years_after_degree_values,
     definitions,
+    base_rows=None,
     include_total_group=False,
     limit_groups=None,
     limit_course_types=None,
@@ -805,13 +1062,22 @@ def scrape_degree_class_dataset(
         include_total=True,
         limit=limit_course_types,
     )
-    tasks = [
-        (years_after_degree, group, course_type)
-        for years_after_degree in years_after_degree_values
-        for group in groups
-        for course_type in course_types
-        if valid_course_type_task(years_after_degree, group, course_type)
-    ]
+    if base_rows is not None:
+        tasks = degree_class_tasks_from_base_rows(base_rows)
+    else:
+        universities = selected_options(
+            options.get("ateneo", []),
+            include_total=True,
+            limit=None,
+        )
+        tasks = [
+            (years_after_degree, university, group, course_type)
+            for years_after_degree in years_after_degree_values
+            for university in universities
+            for group in groups
+            for course_type in course_types
+            if valid_course_type_task(years_after_degree, group, course_type)
+        ]
 
     rows = []
     with ThreadPoolExecutor(max_workers=workers) as executor:
@@ -820,20 +1086,22 @@ def scrape_degree_class_dataset(
                 scrape_one_group_course_by_degree_class,
                 survey_year,
                 years_after_degree,
+                university,
                 group,
                 course_type,
                 set(definitions),
-            ): (years_after_degree, group, course_type)
-            for years_after_degree, group, course_type in tasks
+            ): (years_after_degree, university, group, course_type)
+            for years_after_degree, university, group, course_type in tasks
         }
         for index, future in enumerate(as_completed(future_to_task), start=1):
-            years_after_degree, group, course_type = future_to_task[future]
+            years_after_degree, university, group, course_type = future_to_task[future]
             try:
                 rows.extend(future.result())
             except Exception as exc:
                 print(
                     "WARNING: skipped degree classes",
                     f"annolau={years_after_degree}",
+                    f"ateneo={university['value']}",
                     f"gruppo={group['value']}",
                     f"corstipo={course_type['value']}",
                     f"reason={exc}",
@@ -849,6 +1117,93 @@ def scrape_degree_class_dataset(
             str(row["disciplinary_group"]),
             str(row["course_type"]),
             str(row["degree_class"]),
+            str(row["university"]),
+        )
+    )
+    return rows, options
+
+
+def scrape_degree_course_dataset(
+    survey_year,
+    years_after_degree_values,
+    definitions,
+    base_rows=None,
+    include_total_group=False,
+    limit_groups=None,
+    limit_course_types=None,
+    workers=4,
+):
+    options = get_options(config="occupazione", survey_year=survey_year)
+    groups = selected_options(
+        options.get("gruppo", []),
+        include_total=include_total_group,
+        limit=limit_groups,
+    )
+    course_types = selected_options(
+        options.get("corstipo", []),
+        include_total=True,
+        limit=limit_course_types,
+    )
+    if base_rows is not None:
+        tasks = degree_course_tasks_from_base_rows(base_rows)
+    else:
+        universities = selected_options(
+            options.get("ateneo", []),
+            include_total=True,
+            limit=None,
+        )
+        tasks = [
+            (years_after_degree, university, group, course_type)
+            for years_after_degree in years_after_degree_values
+            for university in universities
+            for group in groups
+            for course_type in course_types
+            if (
+                course_type["value"] != "tutti"
+                and valid_course_type_task(years_after_degree, group, course_type)
+            )
+        ]
+
+    rows = []
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_task = {
+            executor.submit(
+                scrape_one_group_course_by_degree_course,
+                survey_year,
+                years_after_degree,
+                university,
+                group,
+                course_type,
+                set(definitions),
+            ): (years_after_degree, university, group, course_type)
+            for years_after_degree, university, group, course_type in tasks
+        }
+        for index, future in enumerate(as_completed(future_to_task), start=1):
+            years_after_degree, university, group, course_type = future_to_task[future]
+            try:
+                rows.extend(future.result())
+            except Exception as exc:
+                print(
+                    "WARNING: skipped degree courses",
+                    f"annolau={years_after_degree}",
+                    f"ateneo={university['value']}",
+                    f"gruppo={group['value']}",
+                    f"corstipo={course_type['value']}",
+                    f"reason={exc}",
+                )
+            if index % 25 == 0 or index == len(tasks):
+                print(f"Completed {index}/{len(tasks)} AlmaLaurea degree-course pages")
+
+    rows.sort(
+        key=lambda row: (
+            row["survey_year"],
+            row["years_after_degree"],
+            row["employment_definition"],
+            str(row["disciplinary_group"]),
+            str(row["course_type"]),
+            str(row["degree_class"]),
+            str(row["degree_course"]),
+            str(row["university"]),
         )
     )
     return rows, options
@@ -983,6 +1338,8 @@ def ready_boxplot_rows(rows, graduation_year, definition):
         if row["disciplinary_group_code"] == "tutti":
             continue
         if row.get("degree_class", "*") != "*":
+            continue
+        if row.get("degree_course", "*") != "*":
             continue
 
         group = display_group(row["disciplinary_group"])

@@ -4,6 +4,7 @@ from utils import (
     resolve_survey_year,
     scrape_dashboard_dataset_by_university,
     scrape_degree_class_dataset,
+    scrape_degree_course_dataset,
     write_csv,
     write_lookup_csv,
 )
@@ -17,9 +18,11 @@ USE_LATEST_SURVEY_YEAR = True
 YEARS_AFTER_DEGREE = [1, 5]
 DEFINITIONS = ["restrictive", "broad"]
 WORKERS = 4
+DEGREE_COURSE_WORKERS = 2
 
 OUTPUT_DIR = Path("outputs/dati")
 INCLUDE_DEGREE_CLASS_DATA = True
+INCLUDE_DEGREE_COURSE_DATA = True
 INCLUDE_TOTAL_GROUP = False
 
 # Imposta numeri piccoli per test veloci, poi rimetti None per il download completo.
@@ -52,6 +55,7 @@ def sort_rows(rows):
             str(row["disciplinary_group"]),
             str(row["course_type"]),
             str(row.get("degree_class", "*")),
+            str(row.get("degree_course", "*")),
             str(row["university"]),
         ),
     )
@@ -66,9 +70,11 @@ def run_download_dati_almalaurea(
     output_dir,
     workers,
     include_degree_class_data,
+    include_degree_course_data,
     include_total_group,
     limit_groups,
     limit_course_types,
+    degree_course_workers=None,
 ):
     requested_years = survey_years if survey_years is not None else [survey_year]
     resolved_survey_years = [
@@ -87,9 +93,11 @@ def run_download_dati_almalaurea(
             output_dir=output_dir,
             workers=workers,
             include_degree_class_data=include_degree_class_data,
+            include_degree_course_data=include_degree_course_data,
             include_total_group=include_total_group,
             limit_groups=limit_groups,
             limit_course_types=limit_course_types,
+            degree_course_workers=degree_course_workers,
         )
 
 
@@ -100,9 +108,11 @@ def run_download_dati_almalaurea_per_anno(
     output_dir,
     workers,
     include_degree_class_data,
+    include_degree_course_data,
     include_total_group,
     limit_groups,
     limit_course_types,
+    degree_course_workers=None,
 ):
     rows, options = scrape_dashboard_dataset_by_university(
         survey_year=resolved_survey_year,
@@ -119,12 +129,26 @@ def run_download_dati_almalaurea_per_anno(
             survey_year=resolved_survey_year,
             years_after_degree_values=years_after_degree,
             definitions=definitions,
+            base_rows=rows,
             include_total_group=include_total_group,
             limit_groups=limit_groups,
             limit_course_types=limit_course_types,
             workers=workers,
         )
         rows.extend(degree_class_rows)
+
+    if include_degree_course_data:
+        degree_course_rows, _ = scrape_degree_course_dataset(
+            survey_year=resolved_survey_year,
+            years_after_degree_values=years_after_degree,
+            definitions=definitions,
+            base_rows=rows,
+            include_total_group=include_total_group,
+            limit_groups=limit_groups,
+            limit_course_types=limit_course_types,
+            workers=degree_course_workers or workers,
+        )
+        rows.extend(degree_course_rows)
 
     rows = sort_rows(rows)
     data_path = output_dir / data_filename(resolved_survey_year, years_after_degree, definitions)
@@ -147,7 +171,9 @@ if __name__ == "__main__":
         output_dir=OUTPUT_DIR,
         workers=WORKERS,
         include_degree_class_data=INCLUDE_DEGREE_CLASS_DATA,
+        include_degree_course_data=INCLUDE_DEGREE_COURSE_DATA,
         include_total_group=INCLUDE_TOTAL_GROUP,
         limit_groups=LIMIT_GROUPS,
         limit_course_types=LIMIT_COURSE_TYPES,
+        degree_course_workers=DEGREE_COURSE_WORKERS,
     )

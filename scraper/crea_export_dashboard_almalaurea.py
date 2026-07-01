@@ -119,6 +119,7 @@ def dashboard_record(row):
     group = normalized_value(row.get("disciplinary_group"))
     course_type = normalized_value(row.get("course_type"))
     degree_class = normalized_value(row.get("degree_class"))
+    degree_course = normalized_value(row.get("degree_course"))
 
     return {
         "survey_year": parse_int(row.get("survey_year")),
@@ -129,6 +130,7 @@ def dashboard_record(row):
         "disciplinary_group": group,
         "course_type": course_type,
         "degree_class": degree_class,
+        "degree_course": degree_course,
         "graduates": parse_int(row.get("graduates")),
         "employment_rate": parse_float(row.get("employment_rate")),
         "net_monthly_salary": parse_float(row.get("net_monthly_salary")),
@@ -141,7 +143,8 @@ def timeseries_record(row):
     group = normalized_value(row.get("disciplinary_group"))
     course_type = normalized_value(row.get("course_type"))
     degree_class = normalized_value(row.get("degree_class"))
-    if degree_class != "*":
+    degree_course = normalized_value(row.get("degree_course"))
+    if degree_class != "*" or degree_course != "*":
         return None
 
     return {
@@ -276,6 +279,7 @@ def build_metadata(records, source_paths, timeseries_records=None, timeseries_pa
             ),
             "course_type": filter_options(records, "course_type", include_wildcard=True),
             "degree_class": filter_options(records, "degree_class", include_wildcard=True),
+            "degree_course": filter_options(records, "degree_course", include_wildcard=True),
         },
         "methodology": [
             "La coorte di laurea e' calcolata come anno indagine meno anni dalla laurea.",
@@ -285,6 +289,7 @@ def build_metadata(records, source_paths, timeseries_records=None, timeseries_pa
             "Nelle serie storiche, a parita' di anni dalla laurea, ogni anno di indagine osserva una coorte diversa.",
             "Non tutte le combinazioni di filtri sono pubblicate da AlmaLaurea.",
             "I tipi di corso possono cambiare nel tempo; le serie mostrano solo le combinazioni disponibili in ciascun anno.",
+            "Il dettaglio per corso di laurea usa la variabile postcorso pubblicata da AlmaLaurea quando e' disponibile.",
             "I valori mancanti dipendono dalla disponibilita' delle viste sul sito sorgente.",
             "La retribuzione e' espressa come retribuzione mensile netta.",
         ],
