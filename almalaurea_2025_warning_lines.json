@@ -1,0 +1,7 @@
+[
+  {
+    "file": "recupero_corsi_almalaurea_2025.log",
+    "line": 45,
+    "text": "WARNING: skipped degree courses annolau=1 ateneo=tutti gruppo=14 corstipo=L reason=Could not fetch https://www2.almalaurea.it/cgi-php/universita/statistiche/visualizza.php?anno=2025&corstipo=L&ateneo=tutti&facolta=tutti&gruppo=14&livello=tutti&area4=tutti&pa=tutti&classe=tutti&postcorso=tutti&annolau=1&isstella=0&condocc=tutti&iscrls=tutti&disaggregazione=postcorso&LANG=it&CONFIG=occupazione"
+  }
+]
