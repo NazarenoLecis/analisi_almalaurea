@@ -11,11 +11,13 @@ from utils import (
 
 
 SURVEY_YEAR = "latest"
+# None scarica solo l'ultimo anno disponibile. Usa una lista, es. [2024, 2025, 2026],
+# per rigenerare piu' anni nello stesso run.
 SURVEY_YEARS = None
 USE_LATEST_SURVEY_YEAR = True
 
-# Distanza temporale dalla laurea da scaricare, per esempio [1, 3, 5].
-YEARS_AFTER_DEGREE = [1, 5]
+# Distanze temporali AlmaLaurea necessarie alla dashboard.
+YEARS_AFTER_DEGREE = [1, 3, 5]
 DEFINITIONS = ["restrictive", "broad"]
 WORKERS = 4
 DEGREE_COURSE_WORKERS = 2

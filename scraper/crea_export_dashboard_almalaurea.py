@@ -33,6 +33,20 @@ def survey_year_from_path(path):
     return int(Path(path).name.split("__survey_")[1].split("__", 1)[0])
 
 
+def years_after_degree_from_path(path):
+    suffix = Path(path).name.split("__annolau_", 1)[1].split("__defs_", 1)[0]
+    return tuple(int(value) for value in suffix.split("_") if value.isdigit())
+
+
+def master_csv_priority(path):
+    years_after_degree = years_after_degree_from_path(path)
+    return (
+        len(set(years_after_degree)),
+        years_after_degree,
+        Path(path).stat().st_mtime,
+    )
+
+
 def select_recent_paths(paths, year_window):
     paths = list(paths)
     if year_window is None:
@@ -72,9 +86,19 @@ def timeseries_csvs(timeseries_input_csvs, data_dir, timeseries_start_year):
 
 
 def master_csvs(data_dir):
-    return sorted(
+    candidates = sorted(
         Path(data_dir).glob("almalaurea_occupazione__survey_*__annolau_*__defs_*.csv")
     )
+    preferred_by_year = {}
+    for path in candidates:
+        survey_year = survey_year_from_path(path)
+        current = preferred_by_year.get(survey_year)
+        if current is None or master_csv_priority(path) > master_csv_priority(current):
+            preferred_by_year[survey_year] = path
+    return [
+        preferred_by_year[survey_year]
+        for survey_year in sorted(preferred_by_year)
+    ]
 
 
 def parse_int(value):

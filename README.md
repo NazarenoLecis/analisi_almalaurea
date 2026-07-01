@@ -38,6 +38,30 @@ python charts/main.py
 python scraper/crea_export_dashboard_almalaurea.py
 ```
 
+Per aggiornare direttamente i JSON da caricare su Cloudflare, usa il runner unico:
+
+```powershell
+python scraper/genera_json_cloudflare_almalaurea.py
+```
+
+Il comando scarica l'ultimo anno AlmaLaurea disponibile con le distanze `1`, `3` e `5` anni dalla laurea, include dettaglio per classe e corso quando AlmaLaurea lo pubblica, e rigenera:
+
+- `outputs/web/almalaurea_dashboard_data.json`
+- `outputs/web/almalaurea_metadata.json`
+- `outputs/web/almalaurea_timeseries_data.json`
+
+Per un rebuild completo di tutti gli anni pubblicati da AlmaLaurea:
+
+```powershell
+python scraper/genera_json_cloudflare_almalaurea.py --survey-years all
+```
+
+Per rigenerare solo i JSON dai CSV gia' presenti:
+
+```powershell
+python scraper/genera_json_cloudflare_almalaurea.py --skip-download
+```
+
 ## Configurazione Dati
 
 La parte dati e' divisa in tre file:
@@ -51,7 +75,7 @@ In `scraper/download_dati_almalaurea.py` le variabili principali sono:
 
 - `USE_LATEST_SURVEY_YEAR`: se `True`, usa l'ultimo anno disponibile sul sito AlmaLaurea
 - `SURVEY_YEARS`: se valorizzata, scarica piu' anni di indagine, ad esempio `[2022, 2023, 2024, 2025]`
-- `YEARS_AFTER_DEGREE`: distanze temporali dalla laurea, ad esempio `[1, 5]`
+- `YEARS_AFTER_DEGREE`: distanze temporali dalla laurea, ad esempio `[1, 3, 5]`
 - `DEFINITIONS`: definizioni occupazionali da scaricare, ad esempio `["restrictive", "broad"]`
 - `INCLUDE_DEGREE_CLASS_DATA`: se `True`, include anche le righe per classe di laurea
 - `LIMIT_GROUPS` e `LIMIT_COURSE_TYPES`: utili per test rapidi; per lo scarico completo lasciale a `None`
@@ -126,7 +150,9 @@ Lo script `scraper/crea_export_dashboard_almalaurea.py` legge automaticamente i 
 - `outputs/web/almalaurea_metadata.json`
 - `outputs/web/almalaurea_timeseries_data.json`
 
-Questi file sono pensati per una dashboard statica pubblicabile su GitHub Pages: il sito legge i JSON direttamente dal browser e applica i filtri lato client.
+Questi file sono pensati per una dashboard statica pubblicabile su Cloudflare: il sito legge i JSON direttamente dal browser e applica i filtri lato client.
+
+Quando esistono piu' master CSV per lo stesso anno, ad esempio uno storico `annolau_1_5` e uno nuovo `annolau_1_3_5`, l'export usa automaticamente il file piu' completo.
 
 Se in `outputs/dati` sono presenti master CSV di piu' anni, l'export web usa due livelli:
 

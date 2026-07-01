@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from download_dati_almalaurea import DEFINITIONS, OUTPUT_DIR, sort_rows
+from download_dati_almalaurea import DEFINITIONS, OUTPUT_DIR, YEARS_AFTER_DEGREE, sort_rows
 from utils import (
     infer_survey_year,
     read_csv,
@@ -9,9 +9,23 @@ from utils import (
 )
 
 
-INPUT_CSV = OUTPUT_DIR / "almalaurea_occupazione__survey_2025__annolau_1_5__defs_restrictive_broad.csv"
-YEARS_AFTER_DEGREE = [1, 5]
+INPUT_CSV = None
 WORKERS = 2
+
+
+def latest_input_csv(output_dir):
+    candidates = sorted(
+        Path(output_dir).glob("almalaurea_occupazione__survey_*__annolau_*__defs_*.csv")
+    )
+    if not candidates:
+        raise FileNotFoundError(f"No AlmaLaurea master CSV found in {output_dir}")
+    return max(
+        candidates,
+        key=lambda path: (
+            int(path.name.split("__survey_")[1].split("__", 1)[0]),
+            path.stat().st_mtime,
+        ),
+    )
 
 
 def base_rows_for_degree_courses(rows):
@@ -24,7 +38,7 @@ def base_rows_for_degree_courses(rows):
 
 
 def run_recupera_corsi_almalaurea(input_csv, years_after_degree, definitions, workers):
-    input_csv = Path(input_csv)
+    input_csv = Path(input_csv) if input_csv is not None else latest_input_csv(OUTPUT_DIR)
     rows = read_csv(input_csv)
     survey_year = infer_survey_year(rows)
     base_rows = base_rows_for_degree_courses(rows)

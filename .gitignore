@@ -203,6 +203,14 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Local fallback packages and temporary wheels
+vendor/
+_bs4_pkg/
+_soupsieve_pkg/
+_urllib3_pkg/
+temp_*.whl
+temp_*.zip
+
 # Ruff stuff:
 .ruff_cache/
 
