@@ -1,0 +1,15 @@
+{
+  "csv_path": "outputs/dati/almalaurea_occupazione__survey_2025__annolau_1_5__defs_restrictive_broad.csv",
+  "json_path": "outputs/web/almalaurea_dashboard_data.json",
+  "csv_counts": {
+    "infermieristica (L/SNT1)": 2,
+    "infermieristica (SNT/1)": 2
+  },
+  "json_counts": {
+    "infermieristica (L/SNT1)": 2,
+    "infermieristica (SNT/1)": 2
+  },
+  "csv_row_count": 57498,
+  "json_record_count": 132428,
+  "missing": []
+}
