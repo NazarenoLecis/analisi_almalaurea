@@ -1,0 +1,168 @@
+name: Complete AlmaLaurea 2025 degree-course recovery
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/complete-almalaurea-2025.yml
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  recover-degree-courses:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run recovery and export
+        run: |
+          set -o pipefail
+          python3 -u scraper/recupera_corsi_almalaurea.py 2>&1 | tee recupero_corsi_almalaurea_2025.log
+          python3 -u scraper/crea_export_dashboard_almalaurea.py 2>&1 | tee export_dashboard_almalaurea_2025.log
+
+      - name: Verify required Cagliari nursing records
+        run: |
+          python3 - <<'PY'
+          import csv
+          import json
+          from pathlib import Path
+
+          csv_path = Path('outputs/dati/almalaurea_occupazione__survey_2025__annolau_1_5__defs_restrictive_broad.csv')
+          json_path = Path('outputs/web/almalaurea_dashboard_data.json')
+          courses = ['infermieristica (L/SNT1)', 'infermieristica (SNT/1)']
+
+          def matches(row, course):
+              return (
+                  row.get('university') == 'Cagliari'
+                  and row.get('disciplinary_group') == 'Medico-Sanitario e Farmaceutico'
+                  and row.get('course_type') == 'laurea di primo livello'
+                  and row.get('degree_course') == course
+              )
+
+          with csv_path.open(encoding='utf-8-sig', newline='') as handle:
+              csv_rows = list(csv.DictReader(handle))
+          csv_counts = {course: sum(1 for row in csv_rows if matches(row, course)) for course in courses}
+
+          payload = json.loads(json_path.read_text(encoding='utf-8'))
+          records = payload.get('records', [])
+          json_counts = {course: sum(1 for row in records if matches(row, course)) for course in courses}
+
+          missing = [course for course in courses if csv_counts[course] == 0 or json_counts[course] == 0]
+          result = {
+              'csv_path': str(csv_path),
+              'json_path': str(json_path),
+              'csv_counts': csv_counts,
+              'json_counts': json_counts,
+              'csv_row_count': len(csv_rows),
+              'json_record_count': len(records),
+              'missing': missing,
+          }
+          Path('almalaurea_2025_verifica_cagliari_infermieristica.json').write_text(
+              json.dumps(result, ensure_ascii=False, indent=2),
+              encoding='utf-8',
+          )
+          print(json.dumps(result, ensure_ascii=False, indent=2))
+          if missing:
+              raise SystemExit(f'Missing required records: {missing}')
+          PY
+
+      - name: Summarise warnings and skipped combinations
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          log_paths = [Path('recupero_corsi_almalaurea_2025.log'), Path('export_dashboard_almalaurea_2025.log')]
+          patterns = re.compile(r'(warning|warn|skip|skipped|saltat|fallit|failed|error|errore|exception|timeout|postcorso|solotendine)', re.IGNORECASE)
+          warning_lines = []
+          for path in log_paths:
+              if not path.exists():
+                  continue
+              for i, line in enumerate(path.read_text(encoding='utf-8', errors='replace').splitlines(), start=1):
+                  if patterns.search(line):
+                      warning_lines.append({'file': str(path), 'line': i, 'text': line})
+
+          verification_path = Path('almalaurea_2025_verifica_cagliari_infermieristica.json')
+          verification = {}
+          if verification_path.exists():
+              verification = json.loads(verification_path.read_text(encoding='utf-8'))
+
+          report_lines = [
+              '# Report recupero AlmaLaurea 2025',
+              '',
+              'Comandi eseguiti:',
+              '',
+              '```bash',
+              'python3 -u scraper/recupera_corsi_almalaurea.py',
+              'python3 -u scraper/crea_export_dashboard_almalaurea.py',
+              '```',
+              '',
+              '## Verifica Cagliari infermieristica',
+              '',
+              f"CSV rows: {verification.get('csv_row_count')}",
+              f"JSON records: {verification.get('json_record_count')}",
+              '',
+              '```json',
+              json.dumps({
+                  'csv_counts': verification.get('csv_counts'),
+                  'json_counts': verification.get('json_counts'),
+                  'missing': verification.get('missing'),
+              }, ensure_ascii=False, indent=2),
+              '```',
+              '',
+              '## Warning e combinazioni saltate',
+              '',
+              f'Righe rilevate nei log: {len(warning_lines)}',
+              '',
+          ]
+          if warning_lines:
+              report_lines.extend(['Prime 200 righe rilevate:', ''])
+              for item in warning_lines[:200]:
+                  report_lines.append(f"- `{item['file']}:{item['line']}` {item['text']}")
+          else:
+              report_lines.append('Nessuna riga warning/skip/error rilevata nei log salvati.')
+
+          Path('CHECKPOINT_DATI_2025_RUN_REPORT.md').write_text('\n'.join(report_lines) + '\n', encoding='utf-8')
+          Path('almalaurea_2025_warning_lines.json').write_text(
+              json.dumps(warning_lines, ensure_ascii=False, indent=2),
+              encoding='utf-8',
+          )
+          PY
+
+      - name: Commit generated data to PR branch
+        if: success()
+        run: |
+          rm -f .github/workflows/complete-almalaurea-2025.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add outputs/dati/almalaurea_occupazione__survey_2025__annolau_1_5__defs_restrictive_broad.csv
+          git add outputs/web/almalaurea_dashboard_data.json outputs/web/almalaurea_metadata.json outputs/web/almalaurea_timeseries_data.json
+          git add CHECKPOINT_DATI_2025_RUN_REPORT.md almalaurea_2025_verifica_cagliari_infermieristica.json almalaurea_2025_warning_lines.json recupero_corsi_almalaurea_2025.log export_dashboard_almalaurea_2025.log
+          git add .github/workflows/complete-almalaurea-2025.yml
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Complete AlmaLaurea 2025 degree-course recovery"
+            git push origin HEAD:${{ github.head_ref }}
+          fi
