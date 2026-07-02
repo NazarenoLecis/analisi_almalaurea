@@ -32,16 +32,16 @@ python scraper/crea_struttura_dataset_almalaurea.py
 python charts/main.py
 ```
 
-4. Crea i JSON per la dashboard web.
+4. Crea i JSON per una dashboard web o per altri riusi statici.
 
 ```powershell
 python scraper/crea_export_dashboard_almalaurea.py
 ```
 
-Per aggiornare direttamente i JSON da caricare su Cloudflare, usa il runner unico:
+Per scaricare i dati e rigenerare i JSON con un solo comando, usa il runner unico:
 
 ```powershell
-python scraper/genera_json_cloudflare_almalaurea.py
+python scraper/genera_json_almalaurea.py
 ```
 
 Il comando scarica l'ultimo anno AlmaLaurea disponibile con le distanze `1`, `3` e `5` anni dalla laurea, include dettaglio per classe e corso quando AlmaLaurea lo pubblica, e rigenera:
@@ -50,17 +50,7 @@ Il comando scarica l'ultimo anno AlmaLaurea disponibile con le distanze `1`, `3`
 - `outputs/web/almalaurea_metadata.json`
 - `outputs/web/almalaurea_timeseries_data.json`
 
-Per un rebuild completo di tutti gli anni pubblicati da AlmaLaurea:
-
-```powershell
-python scraper/genera_json_cloudflare_almalaurea.py --survey-years all
-```
-
-Per rigenerare solo i JSON dai CSV gia' presenti:
-
-```powershell
-python scraper/genera_json_cloudflare_almalaurea.py --skip-download
-```
+Il runner non usa argomenti da terminale: per rebuild completo, solo export JSON o test veloci, modifica le costanti in cima a `scraper/genera_json_almalaurea.py`.
 
 ## Configurazione Dati
 
@@ -142,7 +132,7 @@ I grafici sono salvati in `outputs/grafici` e la cartella contiene solo file PNG
 
 I CSV aggregati usati per controllare gli scatter sono salvati in `outputs/dati/aggregati_grafici`.
 
-## Export Dashboard Web
+## Export JSON
 
 Lo script `scraper/crea_export_dashboard_almalaurea.py` legge automaticamente i master CSV presenti in `outputs/dati` e scrive:
 
@@ -150,7 +140,7 @@ Lo script `scraper/crea_export_dashboard_almalaurea.py` legge automaticamente i 
 - `outputs/web/almalaurea_metadata.json`
 - `outputs/web/almalaurea_timeseries_data.json`
 
-Questi file sono pensati per una dashboard statica pubblicabile su Cloudflare: il sito legge i JSON direttamente dal browser e applica i filtri lato client.
+Questi file sono pensati per essere consumati da dashboard statiche, notebook o altri strumenti che leggono JSON gia' pronti.
 
 Quando esistono piu' master CSV per lo stesso anno, ad esempio uno storico `annolau_1_5` e uno nuovo `annolau_1_3_5`, l'export usa automaticamente il file piu' completo.
 
