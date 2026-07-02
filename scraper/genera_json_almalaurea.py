@@ -34,10 +34,10 @@ from utils import get_available_survey_years
 DOWNLOAD_DATA = True
 EXPORT_JSON = True
 
-# None scarica l'ultimo anno disponibile.
 # "all" scarica tutti gli anni pubblicati da AlmaLaurea.
+# None scarica solo l'ultimo anno disponibile.
 # Una lista scarica solo gli anni indicati, es. [2023, 2024, 2025].
-SURVEY_YEARS_TO_DOWNLOAD = None
+SURVEY_YEARS_TO_DOWNLOAD = "all"
 YEARS_AFTER_DEGREE_TO_DOWNLOAD = YEARS_AFTER_DEGREE
 
 JSON_DASHBOARD_YEAR_WINDOW = DASHBOARD_YEAR_WINDOW
