@@ -70,10 +70,12 @@ In `scraper/download_dati_almalaurea.py` le variabili principali sono:
 - `INCLUDE_DEGREE_CLASS_DATA`: se `True`, include anche le righe per classe di laurea
 - `LIMIT_GROUPS` e `LIMIT_COURSE_TYPES`: utili per test rapidi; per lo scarico completo lasciale a `None`
 
-Il rapporto tra anno di indagine e coorte e':
+Nel vecchio endpoint statistico AlmaLaurea il parametro `anno` e' un codice interno che precede di un anno l'anno pubblico dell'indagine. Per esempio, la XXVIII indagine pubblicata nel 2026 viene consultata con `anno=2025`.
+
+Il rapporto tra codice interno e coorte resta:
 
 ```text
-anno laurea = anno indagine - anni dalla laurea
+anno laurea = anno endpoint - anni dalla laurea
 ```
 
 ## Output Dati

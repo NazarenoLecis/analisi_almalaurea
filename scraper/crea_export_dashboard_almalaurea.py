@@ -17,6 +17,7 @@ METADATA_OUTPUT = "almalaurea_metadata.json"
 TIMESERIES_OUTPUT = "almalaurea_timeseries_data.json"
 DASHBOARD_YEAR_WINDOW = 10
 TIMESERIES_START_YEAR = 2008
+PUBLICATION_YEAR_OFFSET = 1
 
 
 def latest_master_csv(data_dir):
@@ -126,6 +127,12 @@ def sort_values(values):
     return sorted(values, key=lambda value: (value == "*", str(value).lower()))
 
 
+def publication_year(survey_year):
+    if survey_year is None:
+        return None
+    return int(survey_year) + PUBLICATION_YEAR_OFFSET
+
+
 def row_has_metrics(row):
     return any(
         row.get(name) not in {None, ""}
@@ -217,6 +224,8 @@ def build_metadata(records, source_paths, timeseries_records=None, timeseries_pa
     years_after_degree = unique(records, "years_after_degree")
     timeseries_records = timeseries_records or []
     timeseries_years = unique(timeseries_records, "survey_year")
+    publication_years = [publication_year(value) for value in survey_years]
+    timeseries_publication_years = [publication_year(value) for value in timeseries_years]
     source_paths = [Path(path) for path in source_paths]
 
     return {
@@ -233,8 +242,11 @@ def build_metadata(records, source_paths, timeseries_records=None, timeseries_pa
             for path in (timeseries_paths or [])
         ],
         "latest_survey_year": survey_years[-1] if survey_years else None,
+        "latest_publication_year": publication_year(survey_years[-1]) if survey_years else None,
         "survey_years": survey_years,
+        "publication_years": publication_years,
         "timeseries_years": timeseries_years,
+        "timeseries_publication_years": timeseries_publication_years,
         "dashboard_year_window": len(survey_years),
         "timeseries_start_year": timeseries_years[0] if timeseries_years else None,
         "graduation_years": graduation_years,
@@ -282,7 +294,10 @@ def build_metadata(records, source_paths, timeseries_records=None, timeseries_pa
             },
         ],
         "filters": {
-            "survey_year": [{"value": value, "label": str(value)} for value in survey_years],
+            "survey_year": [
+                {"value": value, "label": str(publication_year(value))}
+                for value in survey_years
+            ],
             "graduation_year": [{"value": value, "label": str(value)} for value in graduation_years],
             "years_after_degree": [
                 {
@@ -316,6 +331,7 @@ def build_metadata(records, source_paths, timeseries_records=None, timeseries_pa
             "Il dettaglio per corso di laurea usa la variabile postcorso pubblicata da AlmaLaurea quando e' disponibile.",
             "I valori mancanti dipendono dalla disponibilita' delle viste sul sito sorgente.",
             "La retribuzione e' espressa come retribuzione mensile netta.",
+            "L'anno interno dell'endpoint storico AlmaLaurea precede di un anno l'anno pubblico dell'indagine: ad esempio anno=2025 corrisponde all'indagine pubblicata nel 2026.",
         ],
     }
 
